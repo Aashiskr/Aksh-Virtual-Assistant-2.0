@@ -1,0 +1,163 @@
+:root {
+  color-scheme: dark;
+  --bg: #070b17;
+  --surface: #111a34;
+  --surface-high: #1c2850;
+  --line: #2c3c70;
+  --accent: #43c7ff;
+  --purple: #8b5cff;
+  --text: #f5f8ff;
+  --muted: #aeb8d6;
+  --error: #ff718a;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body {
+  display: grid;
+  grid-template-rows: 58px minmax(0, 1fr) auto auto auto;
+  background: radial-gradient(circle at 90% 0%, #20134d 0, var(--bg) 36%);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(7, 11, 23, .94);
+}
+.heading { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.heading strong { font-size: 13px; letter-spacing: .08em; }
+#status { color: var(--accent); font-size: 10px; font-weight: 700; margin-top: 2px; }
+.icon-button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 20px;
+}
+
+#screenArea {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background: #000;
+  touch-action: none;
+  user-select: none;
+}
+#remoteVideo, #fallbackFrame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none;
+  transform: scale(1);
+  transform-origin: center;
+  will-change: transform;
+}
+.zoom-controls {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  grid-template-columns: 36px 58px 36px 36px;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(67, 199, 255, .28);
+  border-radius: 13px;
+  background: rgba(7, 11, 23, .82);
+  backdrop-filter: blur(8px);
+}
+.zoom-controls button {
+  min-height: 34px;
+  padding: 0;
+  border-radius: 9px;
+  font-size: 17px;
+}
+#zoomValueButton { font-size: 11px; color: var(--accent); }
+.zoom-controls button:disabled { opacity: .36; }
+#fullScreenButton { font-size: 18px; }
+#fullScreenButton.fullscreen-active {
+  border-color: var(--accent);
+  background: var(--surface-high);
+  color: var(--accent);
+}
+#loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 9px;
+  color: var(--text);
+  text-align: center;
+  padding: 24px;
+}
+#loading span { color: var(--muted); font-size: 12px; }
+.pulse {
+  width: 42px;
+  height: 42px;
+  border: 3px solid rgba(67, 199, 255, .2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.quick-keys {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  padding: 8px 8px 4px;
+  background: var(--bg);
+}
+button {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 650;
+}
+button:active { background: var(--surface-high); transform: scale(.98); }
+
+.keyboard { display: grid; grid-template-columns: 1fr auto; gap: 7px; padding: 5px 8px; }
+.keyboard input {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 11px 12px;
+  outline: none;
+}
+.keyboard input:focus { border-color: var(--accent); }
+#sendTextButton { padding: 0 16px; background: linear-gradient(135deg, #526dff, var(--purple)); }
+
+footer {
+  display: flex;
+  gap: 7px 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 6px 10px 9px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+@media (orientation: landscape) {
+  body { grid-template-rows: 48px minmax(0, 1fr) auto auto; grid-template-columns: minmax(0, 1fr) 220px; }
+  header { grid-column: 1 / -1; }
+  #screenArea { grid-row: 2 / 5; grid-column: 1; }
+  .quick-keys { grid-row: 2; grid-column: 2; grid-template-columns: 1fr 1fr; align-content: start; }
+  .keyboard { grid-row: 3; grid-column: 2; grid-template-columns: 1fr; }
+  footer { grid-row: 4; grid-column: 2; align-content: end; }
+  .zoom-controls { top: 8px; right: 8px; }
+}

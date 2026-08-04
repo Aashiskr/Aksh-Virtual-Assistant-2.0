@@ -1,0 +1,44 @@
+# Secrets and machine-local state
+.env
+private/
+data/
+logs/
+tmp/
+output/
+dist/
+archive/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Node and Cloudflare
+node_modules/
+.wrangler/
+infrastructure/cloudflare/discovery-worker/wrangler.jsonc
+
+# Android/Gradle
+.gradle/
+**/build/
+frontend/mobile/android/local.properties
+*.apk
+*.aab
+
+# Downloaded tools and runtime artifacts
+infrastructure/windows/cloudflared/cloudflared.exe
+output.mp3
+capture.jpg
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini

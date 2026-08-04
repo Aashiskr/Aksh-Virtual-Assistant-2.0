@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "aksh-device-relay",
+  "main": "src/index.js",
+  "compatibility_date": "2026-07-29",
+  "workers_dev": true,
+  "kv_namespaces": [
+    {
+      "binding": "DEVICES",
+      "id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+    }
+  ]
+}

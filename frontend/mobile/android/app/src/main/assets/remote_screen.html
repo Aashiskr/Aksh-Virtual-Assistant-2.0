@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Aksh Remote Screen</title>
+  <style>{{AKSH_STYLE}}</style>
+</head>
+<body>
+  <header>
+    <button id="closeButton" class="icon-button" aria-label="Close">&#x2715;</button>
+    <div class="heading">
+      <strong>AKSH REMOTE SCREEN</strong>
+      <span id="status">CONNECTING</span>
+    </div>
+    <button id="refreshButton" class="icon-button" aria-label="Reconnect">&#x21BB;</button>
+  </header>
+
+  <main id="screenArea">
+    <video id="remoteVideo" autoplay playsinline muted></video>
+    <img id="fallbackFrame" alt="Laptop screen">
+    <div id="zoomControls" class="zoom-controls" aria-label="Screen zoom controls">
+      <button id="zoomOutButton" aria-label="Zoom out">&#x2212;</button>
+      <button id="zoomValueButton" aria-label="Reset zoom">100%</button>
+      <button id="zoomInButton" aria-label="Zoom in">+</button>
+      <button id="fullScreenButton" aria-label="Enter fullscreen landscape" aria-pressed="false">&#x26F6;</button>
+    </div>
+    <div id="loading">
+      <div class="pulse"></div>
+      <strong>Connecting to your laptop</strong>
+      <span>WebRTC live view, with secure HTTPS fallback</span>
+    </div>
+  </main>
+
+  <section class="quick-keys">
+    <button data-key="alt_tab">Alt+Tab</button>
+    <button data-key="esc">Esc</button>
+    <button data-key="backspace">Back</button>
+    <button data-key="enter">Enter</button>
+    <button id="rightClickButton">Right click</button>
+  </section>
+
+  <section class="keyboard">
+    <input id="textInput" maxlength="1000" placeholder="Type on laptop..." autocomplete="off">
+    <button id="sendTextButton">Send text</button>
+  </section>
+
+  <footer>
+    <span>Tap: click</span>
+    <span>Double tap: double-click</span>
+    <span>Hold: right-click</span>
+    <span>Drag: move/drag</span>
+    <span>Pinch: zoom</span>
+    <span>Zoomed: 2-finger pan</span>
+    <span>At 100%: 2-finger scroll</span>
+    <span>Floating button: fullscreen landscape</span>
+  </footer>
+
+  <script>{{AKSH_ZOOM_SCRIPT}}</script>
+  <script>{{AKSH_GESTURES_SCRIPT}}</script>
+  <script>{{AKSH_DISPLAY_SCRIPT}}</script>
+  <script>{{AKSH_SCRIPT}}</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Aksh Remote</string>
+    <string name="title">Aksh Remote</string>
+    <string name="subtitle">Pair once. Speak or type here anytime; Aksh works on your laptop.</string>
+    <string name="discovery_hint">Your Cloudflare discovery relay URL</string>
+    <string name="device_hint">Device ID</string>
+    <string name="server_hint">Manual laptop URL (optional fallback)</string>
+    <string name="token_hint">Pairing token</string>
+    <string name="save_test">Save &amp; test connection</string>
+    <string name="start_listening">Start listening</string>
+    <string name="stop_and_send">Stop &amp; send</string>
+    <string name="or_type_command">OR TYPE A COMMAND</string>
+    <string name="command_hint">e.g. Brave kholo aur YouTube par Hindi songs chalao</string>
+    <string name="send_command">Send command</string>
+    <string name="remote_screen_button">View &amp; control laptop</string>
+    <string name="remote_screen_connecting">Connecting to laptop…</string>
+    <string name="not_connected">Enter your relay URL, Device ID and token once</string>
+    <string name="waiting_for_command">What Aksh heard will appear here.</string>
+    <string name="waiting_for_report">The final text report will appear here.</string>
+    <string name="heard_report">Aksh heard:\n%1$s</string>
+    <string name="typed_command">Typed command:\n%1$s</string>
+    <string name="completion_report">Report:\n%1$s</string>
+</resources>
