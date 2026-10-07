@@ -5,11 +5,25 @@ import tkinter as tk
 from pathlib import Path
 
 from .capture_privacy import set_capture_excluded
-from .theme import MUTED, PANEL_BG, TEXT
+from .theme import (
+    ACCENT,
+    ACCENT_HOVER,
+    DANGER,
+    MUTED,
+    PANEL_BG,
+    SURFACE,
+    SURFACE_ALT,
+    TEXT,
+    WARNING,
+)
+from .window_behavior import (
+    hide_from_taskbar,
+    keep_always_on_top,
+    set_click_through,
+)
 
 
-ACCENT = "#35d6c6"
-WARNING = "#ffbb45"
+REVEAL_DELAY_MILLISECONDS = 100
 
 
 class MeetingOverlay:
@@ -25,6 +39,8 @@ class MeetingOverlay:
         self.report_path: Path | None = None
         self._drag_origin = None
         self._hide_job = None
+        self._reveal_job = None
+        self._visible = False
 
     def show_status(self, title: str, detail: str) -> None:
         self._show(title, detail, accent=ACCENT, compact=True)
@@ -55,7 +71,7 @@ class MeetingOverlay:
         self._show("AKSH · REPLY CORRECTION", body, accent=WARNING)
 
     def show_error(self, message: str) -> None:
-        self._show("MEETING MODE ISSUE", message, accent="#ff6b7d", compact=True)
+        self._show("MEETING MODE ISSUE", message, accent=DANGER, compact=True)
 
     def show_report(self, report: str, path: str) -> None:
         self.report_path = Path(path)
@@ -68,8 +84,11 @@ class MeetingOverlay:
 
     def hide(self) -> None:
         self._cancel_hide()
+        self._cancel_reveal()
         if self.window and self.window.winfo_exists():
-            self.window.withdraw()
+            self.window.attributes("-alpha", 0.0)
+            set_click_through(self.window, True)
+            self._visible = False
 
     def _show(
         self,
@@ -82,11 +101,14 @@ class MeetingOverlay:
     ) -> None:
         self._ensure_window()
         self._cancel_hide()
+        self._cancel_reveal()
         assert self.window and self.title_label and self.content
+        first_reveal = not self._visible
+        if first_reveal:
+            self.window.attributes("-alpha", 0.0)
         self.window.geometry("820x640" if report else (
             "620x250" if compact else "680x430"
         ))
-        self.window.resizable(report, report)
         self.title_label.configure(text=title, fg=accent)
         self.content.configure(state="normal")
         self.content.delete("1.0", "end")
@@ -95,32 +117,42 @@ class MeetingOverlay:
         self.open_button.configure(
             state="normal" if report and self.report_path else "disabled"
         )
-        self.window.deiconify()
-        self.window.attributes("-topmost", True)
-        self.window.lift()
         self.window.update_idletasks()
         self._ensure_on_screen()
+        hide_from_taskbar(self.window)
         set_capture_excluded(self.window)
-        self.root.after(150, lambda: set_capture_excluded(self.window))
+        keep_always_on_top(self.window)
+        if not self.window.winfo_viewable():
+            self.window.deiconify()
+        if first_reveal:
+            self._reveal_job = self.root.after(
+                REVEAL_DELAY_MILLISECONDS,
+                self._reveal_window,
+            )
+        self.root.after(150, self._refresh_window_behavior)
 
     def _ensure_window(self) -> None:
         if self.window and self.window.winfo_exists():
             return
         window = tk.Toplevel(self.root)
+        window.withdraw()
+        window.attributes("-alpha", 0.0)
         self.window = window
         window.title("Aksh Meeting Assist")
         window.attributes("-topmost", True)
+        window.transient(self.root)
         window.configure(bg=PANEL_BG)
         window.geometry(self._initial_geometry())
+        window.resizable(True, True)
         window.protocol("WM_DELETE_WINDOW", self.hide)
 
-        header = tk.Frame(window, bg="#171d33", height=46)
+        header = tk.Frame(window, bg=SURFACE, height=46)
         header.pack(fill="x")
         header.pack_propagate(False)
         self.title_label = tk.Label(
             header,
             text="AKSH · MEETING ASSIST",
-            bg="#171d33",
+            bg=SURFACE,
             fg=ACCENT,
             font=("Segoe UI Semibold", 11),
         )
@@ -129,9 +161,9 @@ class MeetingOverlay:
             header,
             text="×",
             command=self.hide,
-            bg="#171d33",
+            bg=SURFACE,
             fg=TEXT,
-            activebackground="#293152",
+            activebackground=SURFACE_ALT,
             activeforeground=TEXT,
             relief="flat",
             font=("Segoe UI", 14),
@@ -151,7 +183,7 @@ class MeetingOverlay:
             bg=PANEL_BG,
             fg=TEXT,
             insertbackground=TEXT,
-            selectbackground="#3653a5",
+            selectbackground="#b8dcc9",
             relief="flat",
             font=("Segoe UI", 11),
             padx=8,
@@ -178,6 +210,27 @@ class MeetingOverlay:
             fg=MUTED,
             font=("Segoe UI", 9),
         ).pack(side="right")
+        hide_from_taskbar(window)
+        set_capture_excluded(window)
+        set_click_through(window, True)
+        window.deiconify()
+        window.update_idletasks()
+
+    def _reveal_window(self) -> None:
+        self._reveal_job = None
+        if not self.window or not self.window.winfo_exists():
+            return
+        set_click_through(self.window, False)
+        self.window.attributes("-alpha", 1.0)
+        self._visible = True
+        keep_always_on_top(self.window)
+
+    def _refresh_window_behavior(self) -> None:
+        if not self.window or not self.window.winfo_exists():
+            return
+        hide_from_taskbar(self.window)
+        keep_always_on_top(self.window)
+        set_capture_excluded(self.window)
 
     def _initial_geometry(self) -> str:
         width, height = 680, 430
@@ -206,9 +259,9 @@ class MeetingOverlay:
             parent,
             text=text,
             command=command,
-            bg="#293152",
+            bg=SURFACE_ALT,
             fg=TEXT,
-            activebackground="#3653a5",
+            activebackground=ACCENT_HOVER,
             activeforeground=TEXT,
             relief="flat",
             padx=14,
@@ -252,3 +305,8 @@ class MeetingOverlay:
         if self._hide_job is not None:
             self.root.after_cancel(self._hide_job)
             self._hide_job = None
+
+    def _cancel_reveal(self) -> None:
+        if self._reveal_job is not None:
+            self.root.after_cancel(self._reveal_job)
+            self._reveal_job = None

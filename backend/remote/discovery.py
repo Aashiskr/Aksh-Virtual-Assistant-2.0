@@ -78,4 +78,6 @@ class DiscoveryPublisher:
                     LOGGER.warning("Phone discovery refresh failed: %s", exc)
                     self._closing.wait(30)
                     continue
-            self._closing.wait(5 if not public_url else 300)
+            # Check cheaply for a replaced Quick Tunnel URL so phones do not
+            # wait minutes after cloudflared recovers from a network change.
+            self._closing.wait(5 if not public_url else 10)

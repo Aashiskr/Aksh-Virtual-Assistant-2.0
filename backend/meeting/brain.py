@@ -19,6 +19,47 @@ QUESTION_HINT = re.compile(
     re.IGNORECASE,
 )
 
+STRING_ARRAY = {"type": "array", "items": {"type": "string"}}
+ANSWER_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "is_question": {"type": "boolean"},
+        "question": {"type": "string"},
+        "answer": {"type": "string"},
+        "key_points": STRING_ARRAY,
+    },
+    "required": ["is_question", "question", "answer", "key_points"],
+    "additionalProperties": False,
+}
+REPLY_REVIEW_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "needs_correction": {"type": "boolean"},
+        "correction": {"type": "string"},
+        "better_answer": {"type": "string"},
+    },
+    "required": ["needs_correction", "correction", "better_answer"],
+    "additionalProperties": False,
+}
+SUMMARY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summary": {"type": "string"},
+        "key_points": STRING_ARRAY,
+        "decisions": STRING_ARRAY,
+        "action_items": STRING_ARRAY,
+        "follow_ups": STRING_ARRAY,
+    },
+    "required": [
+        "summary",
+        "key_points",
+        "decisions",
+        "action_items",
+        "follow_ups",
+    ],
+    "additionalProperties": False,
+}
+
 
 class MeetingBrain:
     def __init__(self, settings: AkshSettings):
@@ -58,6 +99,8 @@ class MeetingBrain:
                 f"Recent participant audio:\n{utterance}"
             ),
             700,
+            "meeting_answer",
+            ANSWER_SCHEMA,
         )
         if not value.get("is_question"):
             return None
@@ -96,6 +139,8 @@ class MeetingBrain:
                 f"User's actual reply: {owner_reply}"
             ),
             600,
+            "reply_review",
+            REPLY_REVIEW_SCHEMA,
         )
         needed = bool(value.get("needs_correction", False))
         return ReplyReview(
@@ -132,6 +177,8 @@ class MeetingBrain:
             ),
             source,
             1200,
+            "meeting_summary",
+            SUMMARY_SCHEMA,
         )
         return {
             "summary": str(value.get("summary", "")).strip(),
@@ -142,30 +189,79 @@ class MeetingBrain:
         }
 
     def _request(
-        self, instruction: str, user_text: str, max_tokens: int
+        self,
+        instruction: str,
+        user_text: str,
+        max_tokens: int,
+        schema_name: str,
+        schema: dict[str, Any],
     ) -> dict[str, Any]:
         if not self.enabled:
             raise RuntimeError("Meeting Mode ke liye Groq API key required hai.")
-        response = self.client.post(
-            "chat/completions",
-            json={
-                "model": self.settings.groq_model,
-                "messages": [
-                    {"role": "system", "content": instruction},
-                    {"role": "user", "content": user_text},
-                ],
-                "temperature": 0.1,
-                "max_completion_tokens": max_tokens,
-                "response_format": {"type": "json_object"},
+        payload = {
+            "model": self.settings.groq_model,
+            "messages": [
+                {"role": "system", "content": instruction},
+                {"role": "user", "content": user_text},
+            ],
+            "temperature": 0.1,
+            "max_completion_tokens": max_tokens,
+        }
+        response_formats = [
+            {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": schema_name,
+                    "strict": True,
+                    "schema": schema,
+                },
             },
-            timeout=45,
-        )
-        response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"]
+            {"type": "json_object"},
+            None,
+        ]
+        last_response = None
+        last_parse_error: ValueError | json.JSONDecodeError | None = None
+        for response_format in response_formats:
+            request = dict(payload)
+            if response_format is not None:
+                request["response_format"] = response_format
+            response = self.client.post(
+                "chat/completions",
+                json=request,
+                timeout=45,
+            )
+            last_response = response
+            if response.status_code == 400:
+                continue
+            response.raise_for_status()
+            content = response.json()["choices"][0]["message"]["content"]
+            try:
+                return _parse_json_object(content)
+            except (ValueError, json.JSONDecodeError) as exc:
+                last_parse_error = exc
+        if last_response is not None:
+            last_response.raise_for_status()
+        raise ValueError(
+            "Meeting AI ne valid JSON response nahi diya."
+        ) from last_parse_error
+
+
+def _parse_json_object(content: str) -> dict[str, Any]:
+    try:
         value = json.loads(content)
-        if not isinstance(value, dict):
-            raise ValueError("Meeting AI response object nahi tha.")
-        return value
+    except json.JSONDecodeError as original_error:
+        decoder = json.JSONDecoder()
+        for match in re.finditer(r"\{", content):
+            try:
+                value, _ = decoder.raw_decode(content[match.start():])
+            except json.JSONDecodeError:
+                continue
+            if isinstance(value, dict):
+                return value
+        raise original_error
+    if not isinstance(value, dict):
+        raise ValueError("Meeting AI response object nahi tha.")
+    return value
 
 
 def _string_list(value: Any) -> list[str]:

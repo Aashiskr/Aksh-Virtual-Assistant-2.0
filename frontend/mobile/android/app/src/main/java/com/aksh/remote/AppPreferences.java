@@ -20,6 +20,8 @@ final class AppPreferences {
     private static final String URL = "server_url";
     private static final String DEVICE_ID = "device_id";
     private static final String TOKEN = "pairing_token";
+    private static final String CAREER_BRIEFING_ENABLED =
+            "career_briefing_enabled";
     private static final String KEY_ALIAS = "aksh_remote_pairing_key";
     private static final String ENCRYPTED_PREFIX = "v1:";
     private final SharedPreferences preferences;
@@ -64,6 +66,16 @@ final class AppPreferences {
 
     String deviceId() {
         return preferences.getString(DEVICE_ID, "");
+    }
+
+    boolean careerBriefingEnabled() {
+        return preferences.getBoolean(CAREER_BRIEFING_ENABLED, false);
+    }
+
+    void setCareerBriefingEnabled(boolean enabled) {
+        preferences.edit()
+                .putBoolean(CAREER_BRIEFING_ENABLED, enabled)
+                .apply();
     }
 
     void save(

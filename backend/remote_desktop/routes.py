@@ -21,6 +21,27 @@ class RemoteInput(BaseModel):
     key: str | None = Field(default=None, max_length=32)
 
 
+class PresentationAction(BaseModel):
+    action: Literal[
+        "enable",
+        "disable",
+        "toggle",
+        "next",
+        "previous",
+        "zoom_in",
+        "zoom_out",
+        "zoom_reset",
+    ]
+    x: float | None = Field(default=None, ge=0.0, le=1.0)
+    y: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+def _session_http_error(exception: Exception) -> HTTPException:
+    if isinstance(exception, PermissionError):
+        return HTTPException(status_code=403, detail=str(exception))
+    return HTTPException(status_code=401, detail=str(exception))
+
+
 def attach_remote_desktop_routes(
     app: FastAPI,
     manager,
@@ -61,6 +82,13 @@ def attach_remote_desktop_routes(
         manager.remove_session(session)
         return Response(status_code=204)
 
+    @app.post("/v1/screen/sessions/current/heartbeat")
+    def keep_session_alive(
+        _: None = Depends(authorize),
+        session: str = Depends(session_header),
+    ) -> dict[str, bool]:
+        return {"active": True}
+
     @app.get("/v1/screen/frame")
     def screen_frame(
         _: None = Depends(authorize),
@@ -68,12 +96,18 @@ def attach_remote_desktop_routes(
     ) -> Response:
         try:
             content = manager.capture_frame(session)
+        except (KeyError, PermissionError) as exc:
+            raise _session_http_error(exc) from exc
         except Exception as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         return Response(
             content=content,
             media_type="image/jpeg",
-            headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
         )
 
     @app.post("/v1/screen/input", status_code=202)
@@ -84,9 +118,42 @@ def attach_remote_desktop_routes(
     ) -> dict[str, bool]:
         try:
             manager.submit_input(session, event.model_dump(exclude_none=True))
+        except (KeyError, PermissionError) as exc:
+            raise _session_http_error(exc) from exc
         except (ValueError, RuntimeError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"accepted": True}
+
+    @app.get("/v1/screen/presentation")
+    def presentation_state(
+        response: Response,
+        _: None = Depends(authorize),
+        session: str = Depends(session_header),
+    ) -> dict[str, object]:
+        response.headers["Cache-Control"] = "no-store"
+        try:
+            return manager.presentation_state(session)
+        except (KeyError, PermissionError) as exc:
+            raise _session_http_error(exc) from exc
+
+    @app.post("/v1/screen/presentation/actions")
+    def presentation_action(
+        request: PresentationAction,
+        _: None = Depends(authorize),
+        session: str = Depends(session_header),
+    ) -> dict[str, object]:
+        try:
+            options = request.model_dump(exclude_none=True)
+            action = options.pop("action")
+            return manager.submit_presentation_action(
+                session,
+                action,
+                **options,
+            )
+        except (KeyError, PermissionError) as exc:
+            raise _session_http_error(exc) from exc
+        except (ValueError, RuntimeError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post("/v1/screen/webrtc/offer")
     async def webrtc_offer(
@@ -100,5 +167,7 @@ def attach_remote_desktop_routes(
                 sdp=offer.sdp,
                 description_type=offer.type,
             )
+        except (KeyError, PermissionError) as exc:
+            raise _session_http_error(exc) from exc
         except (ValueError, RuntimeError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc

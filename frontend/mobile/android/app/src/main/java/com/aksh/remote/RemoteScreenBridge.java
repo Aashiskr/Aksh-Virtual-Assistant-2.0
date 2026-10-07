@@ -8,7 +8,7 @@ final class RemoteScreenBridge {
     private final RemoteScreenActivity activity;
     private final String baseUrl;
     private final String token;
-    private final String sessionId;
+    private volatile String sessionId;
 
     RemoteScreenBridge(
             RemoteScreenActivity activity,
@@ -43,5 +43,19 @@ final class RemoteScreenBridge {
     @JavascriptInterface
     public void toggleFullscreenLandscape() {
         activity.runOnUiThread(activity::toggleFullscreenLandscape);
+    }
+
+    @JavascriptInterface
+    public void refreshConnection() {
+        activity.refreshRemoteConnection();
+    }
+
+    @JavascriptInterface
+    public void updateScreenSession(String currentSessionId) {
+        if (currentSessionId == null || currentSessionId.isBlank()) {
+            return;
+        }
+        sessionId = currentSessionId;
+        activity.updateScreenSession(currentSessionId);
     }
 }

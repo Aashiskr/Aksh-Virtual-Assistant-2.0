@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/unlock_background"
+    android:padding="22dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/unlock_card"
+        android:elevation="14dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:padding="26dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/unlock_badge"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.12"
+            android:paddingStart="12dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="6dp"
+            android:text="@string/unlock_badge"
+            android:textAllCaps="true"
+            android:textColor="#9DE9D8"
+            android:textSize="11sp" />
+
+        <FrameLayout
+            android:layout_width="104dp"
+            android:layout_height="104dp"
+            android:layout_marginTop="24dp"
+            android:background="@drawable/fingerprint_ring">
+
+            <ImageView
+                android:layout_width="58dp"
+                android:layout_height="58dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/unlock_fingerprint_icon"
+                android:src="@drawable/ic_fingerprint" />
+        </FrameLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:fontFamily="sans-serif-black"
+            android:gravity="center"
+            android:text="@string/unlock_heading"
+            android:textColor="#F5FAFF"
+            android:textSize="28sp" />
+
+        <TextView
+            android:id="@+id/unlockStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:text="@string/unlock_contacting_laptop"
+            android:textColor="#E7F0F8"
+            android:textSize="17sp" />
+
+        <TextView
+            android:id="@+id/unlockDetail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:lineSpacingExtra="3dp"
+            android:text="@string/unlock_contacting_detail"
+            android:textColor="#AFC0CE"
+            android:textSize="14sp" />
+
+        <ProgressBar
+            android:id="@+id/unlockProgress"
+            style="?android:attr/progressBarStyleSmall"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginTop="20dp"
+            android:indeterminateTint="#45D6B5" />
+
+        <Button
+            android:id="@+id/unlockRetry"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="20dp"
+            android:backgroundTint="#45D6B5"
+            android:fontFamily="sans-serif-medium"
+            android:text="@string/unlock_retry"
+            android:textAllCaps="false"
+            android:textColor="#06231E"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/unlockCancel"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:fontFamily="sans-serif-medium"
+            android:text="@string/use_laptop_instead"
+            android:textAllCaps="false"
+            android:textColor="#AFC0CE"
+            android:textSize="14sp" />
+    </LinearLayout>
+</FrameLayout>

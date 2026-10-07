@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import json
-import time
-import webbrowser
 from typing import Any
 
+from ..calendar_meetings import GoogleMeetingScheduler, MeetingStore
 from ..models import ActionResult
 from .base import ActionGroup
 from .whatsapp import WhatsAppController
@@ -14,6 +12,7 @@ class CommunicationActions(ActionGroup):
     def __init__(self, settings):
         super().__init__(settings)
         self.whatsapp = WhatsAppController(settings.whatsapp_country_code)
+        self._meeting_scheduler: GoogleMeetingScheduler | None = None
 
     def whatsapp_message(self, parameters: dict[str, Any]) -> ActionResult:
         contact = self.required(parameters, "contact")
@@ -36,37 +35,31 @@ class CommunicationActions(ActionGroup):
         return ActionResult(True, "WhatsApp call cut kar di.")
 
     def schedule_meeting(self, parameters: dict[str, Any]) -> ActionResult:
-        import pyautogui
-        import pyperclip
-
-        when = self.required(parameters, "time")
-        webbrowser.open("https://meet.google.com/new")
-        time.sleep(6)
-        pyautogui.hotkey("alt", "d")
-        pyautogui.hotkey("ctrl", "c")
-        link = pyperclip.paste()
-        if not str(link).startswith("http"):
-            return ActionResult(False, "Meet open hua, link copy nahi ho paaya.")
-        path = self.settings.data_dir / "meetings.json"
-        meetings = []
-        if path.exists():
-            try:
-                meetings = json.loads(path.read_text(encoding="utf-8"))
-            except Exception:
-                meetings = []
-        meetings.append({"time": when, "link": str(link)})
-        path.write_text(json.dumps(meetings, indent=2), encoding="utf-8")
-        return ActionResult(True, f"Meeting {when} ke liye create aur save ho gayi.")
+        self.required(parameters, "time")
+        if self._meeting_scheduler is None:
+            self._meeting_scheduler = GoogleMeetingScheduler(self.settings)
+        meeting = self._meeting_scheduler.schedule(parameters)
+        account = meeting.get("account_email") or meeting["account"]
+        return ActionResult(
+            True,
+            f"Meeting {meeting['time']} ke liye {account} account se "
+            "schedule ho gayi. Meet link phone app mein copy kar sakte hain.",
+            data={"meeting": meeting},
+        )
 
     def send_meeting(self, parameters: dict[str, Any]) -> ActionResult:
         contact = self.required(parameters, "contact")
         when = self.required(parameters, "time").lower()
-        path = self.settings.data_dir / "meetings.json"
-        if not path.exists():
+        store = MeetingStore(self.settings.data_dir / "meetings.json")
+        meetings = store.all()
+        if not meetings:
             return ActionResult(False, "Koi saved meeting nahi mili.")
-        meetings = json.loads(path.read_text(encoding="utf-8"))
         match = next(
-            (item for item in reversed(meetings) if when in item["time"].lower()),
+            (
+                item
+                for item in reversed(meetings)
+                if when in str(item.get("time", "")).lower()
+            ),
             None,
         )
         if not match:

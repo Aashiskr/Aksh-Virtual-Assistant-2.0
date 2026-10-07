@@ -17,9 +17,26 @@ class PetGeometryTests(unittest.TestCase):
                 screen_width=1920,
                 screen_height=1080,
                 window_width=170,
+                window_height=188,
                 pet_size=96,
             ),
-            (1787, 974),
+            (1787, 892),
+        )
+
+    def test_pet_can_reach_right_edge_on_offset_virtual_desktop(self):
+        self.assertEqual(
+            clamp_pet_position(
+                9999,
+                300,
+                screen_width=3840,
+                screen_height=1080,
+                screen_left=-1920,
+                screen_top=0,
+                window_width=170,
+                window_height=188,
+                pet_size=96,
+            ),
+            (1787, 300),
         )
 
     def test_pet_can_reach_left_and_top_edges(self):
@@ -30,6 +47,7 @@ class PetGeometryTests(unittest.TestCase):
                 screen_width=1920,
                 screen_height=1080,
                 window_width=170,
+                window_height=188,
                 pet_size=96,
             ),
             (-37, -10),
@@ -43,6 +61,7 @@ class PetGeometryTests(unittest.TestCase):
                 screen_width=1920,
                 screen_height=1080,
                 window_width=170,
+                window_height=188,
                 pet_size=96,
             ),
             (400, 300),

@@ -25,6 +25,11 @@ def action_description(action: ActionRequest) -> str:
         contact = action.parameters.get("contact", "contact")
         preview = str(action.parameters.get("message", ""))[:80]
         return f"send WhatsApp message to {contact}: {preview}"
+    if action.name == "schedule_meeting":
+        when = action.parameters.get("time", "requested time")
+        account = action.parameters.get("account")
+        source = f" from {account} account" if account else ""
+        return f"create a meeting at {when}{source}"
     target = (
         action.parameters.get("contact")
         or action.parameters.get("target")

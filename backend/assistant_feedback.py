@@ -51,5 +51,6 @@ class AssistantFeedbackMixin:
             friends=self.security.friends_mode,
             enrolled=self.voiceprint.enrolled,
             brain=self.brain.enabled,
+            continuous_session_armed=self.voice.continuous_session_armed,
         )
         self._status(state, text)

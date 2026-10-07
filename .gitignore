@@ -18,6 +18,7 @@ __pycache__/
 htmlcov/
 .venv/
 venv/
+.phone-unlock-venv/
 
 # Node and Cloudflare
 node_modules/
@@ -28,10 +29,12 @@ infrastructure/cloudflare/discovery-worker/wrangler.jsonc
 .gradle/
 **/build/
 frontend/mobile/android/local.properties
+frontend/mobile/android/app/google-services.json
 *.apk
 *.aab
 
 # Downloaded tools and runtime artifacts
+.tools/
 infrastructure/windows/cloudflared/cloudflared.exe
 output.mp3
 capture.jpg

@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from ..models import ActionRequest, BrainResponse
+from .meeting_intents import meeting_intent
 from .whatsapp_intents import whatsapp_end_call_intent
 
 
@@ -30,7 +31,11 @@ def priority_intent(text: str) -> BrainResponse | None:
         return _action("friend_mode", option="off")
     if any(phrase in normalized for phrase in enable_phrases):
         return _action("friend_mode", option="on")
-    return _shopping_intent(normalized) or _fixed_intent(normalized)
+    return (
+        meeting_intent(normalized)
+        or _shopping_intent(normalized)
+        or _fixed_intent(normalized)
+    )
 
 
 def local_intent(text: str) -> BrainResponse:
@@ -44,7 +49,8 @@ def local_intent(text: str) -> BrainResponse:
     if fixed:
         return fixed
     result = (
-        _shopping_intent(normalized)
+        meeting_intent(normalized)
+        or _shopping_intent(normalized)
         or _level_intent(normalized)
         or _communication_intent(normalized)
         or _search_and_media_intent(normalized)

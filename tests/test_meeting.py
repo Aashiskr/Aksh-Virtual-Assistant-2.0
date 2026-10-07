@@ -9,7 +9,7 @@ import numpy as np
 from backend.assistant import AkshAssistant
 from backend.config import AkshSettings
 from backend.meeting.audio_capture import AudioSegmenter
-from backend.meeting.brain import MeetingBrain, _text_chunks
+from backend.meeting.brain import MeetingBrain, _parse_json_object, _text_chunks
 from backend.meeting.controller import MeetingController
 from backend.meeting.models import ReplyReview
 from backend.meeting.session import MeetingSession
@@ -104,6 +104,45 @@ class MeetingBrainTests(unittest.TestCase):
             "Python developer profile",
             request["messages"][1]["content"],
         )
+        self.assertEqual(request["response_format"]["type"], "json_schema")
+
+    def test_json_validation_400_retries_without_forcing_json_mode(self):
+        brain = MeetingBrain(AkshSettings(groq_api_key="gsk_test"))
+        brain.profile = Mock()
+        brain.profile.context.return_value = ""
+        bad_schema = Mock(status_code=400)
+        bad_json_mode = Mock(status_code=400)
+        plain = Mock(status_code=200)
+        plain.json.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "is_question": True,
+                                "question": "What is an API?",
+                                "answer": "A software interface.",
+                                "key_points": [],
+                            }
+                        )
+                    }
+                }
+            ]
+        }
+        brain.client = Mock()
+        brain.client.post.side_effect = [bad_schema, bad_json_mode, plain]
+
+        result = brain.suggest_answer("What is an API?", "")
+
+        self.assertEqual(result[1], "A software interface.")
+        requests = brain.client.post.call_args_list
+        self.assertEqual(len(requests), 3)
+        self.assertNotIn("response_format", requests[2].kwargs["json"])
+        plain.raise_for_status.assert_called_once_with()
+
+    def test_json_object_can_be_extracted_from_fenced_response(self):
+        value = _parse_json_object('Result:\n```json\n{"ok": true}\n```')
+        self.assertEqual(value, {"ok": True})
 
 
 class AudioSegmenterTests(unittest.TestCase):

@@ -31,6 +31,9 @@ class AkshSettings:
     )
     wake_listener_enabled: bool = True
     continuous_listening_enabled: bool = True
+    double_clap_enabled: bool = True
+    mute_output_while_listening: bool = True
+    voice_followup_turn_limit: int = 3
     voice_lock_enabled: bool = False
     smart_environment_enabled: bool = True
     hotkey: str = "ctrl+alt+k"

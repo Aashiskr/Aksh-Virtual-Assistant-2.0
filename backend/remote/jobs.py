@@ -3,7 +3,8 @@ from __future__ import annotations
 import threading
 import time
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
 
 @dataclass(slots=True)
@@ -14,6 +15,7 @@ class RemoteJob:
     report: str = ""
     error: str = ""
     created_at: float = 0.0
+    meeting: dict[str, Any] | None = field(default=None)
 
     def public(self) -> dict[str, object]:
         return asdict(self)
@@ -39,13 +41,21 @@ class RemoteJobStore:
     def processing(self, job_id: str, heard: str = "") -> None:
         self._update(job_id, state="processing", heard=heard)
 
-    def complete(self, job_id: str, heard: str, report: str) -> None:
+    def complete(
+        self,
+        job_id: str,
+        heard: str,
+        report: str,
+        *,
+        meeting: dict[str, Any] | None = None,
+    ) -> None:
         self._update(
             job_id,
             state="completed",
             heard=heard,
             report=report,
             error="",
+            meeting=meeting,
         )
 
     def fail(self, job_id: str, error: str, heard: str = "") -> None:
@@ -56,7 +66,7 @@ class RemoteJobStore:
             error=error,
         )
 
-    def _update(self, job_id: str, **values: str) -> None:
+    def _update(self, job_id: str, **values: Any) -> None:
         with self._lock:
             job = self._jobs.get(job_id)
             if not job:

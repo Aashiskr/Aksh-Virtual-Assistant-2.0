@@ -18,11 +18,21 @@ import java.util.concurrent.Executors;
 
 final class RemoteApiClient {
     interface Listener {
-        void onUpdate(String state, String heard, String report, String error);
+        void onUpdate(
+                String state,
+                String heard,
+                String report,
+                String error,
+                JSONObject meeting
+        );
     }
 
     interface ScreenSessionListener {
         void onReady(String baseUrl, String token, String sessionId, String error);
+    }
+
+    interface MeetingListener {
+        void onResult(JSONObject meeting);
     }
 
     private final String manualUrl;
@@ -50,7 +60,7 @@ final class RemoteApiClient {
             Exception lastError = null;
             for (int attempt = 0; attempt < 6; attempt++) {
                 try {
-                    listener.onUpdate("resolving", "", "", "");
+                    listener.onUpdate("resolving", "", "", "", null);
                     String baseUrl = resolveBaseUrl();
                     JSONObject response = request(
                             baseUrl, "GET", "/v1/health", null, null
@@ -60,7 +70,8 @@ final class RemoteApiClient {
                             "",
                             "Connected to "
                                     + response.optString("assistant", "Aksh"),
-                            ""
+                            "",
+                            null
                     );
                     return;
                 } catch (Exception exception) {
@@ -75,20 +86,20 @@ final class RemoteApiClient {
                     }
                 }
             }
-            listener.onUpdate("failed", "", "", cleanError(lastError));
+            listener.onUpdate("failed", "", "", cleanError(lastError), null);
         });
     }
 
     void sendAudio(File audio, Listener listener) {
         executor.execute(() -> {
             try {
-                listener.onUpdate("resolving", "", "", "");
+                listener.onUpdate("resolving", "", "", "", null);
                 String baseUrl = resolveBaseUrl();
-                listener.onUpdate("uploading", "", "", "");
+                listener.onUpdate("uploading", "", "", "", null);
                 String jobId = upload(baseUrl, audio);
                 poll(baseUrl, jobId, listener);
             } catch (Exception exception) {
-                listener.onUpdate("failed", "", "", cleanError(exception));
+                listener.onUpdate("failed", "", "", cleanError(exception), null);
             } finally {
                 audio.delete();
             }
@@ -98,9 +109,9 @@ final class RemoteApiClient {
     void sendText(String command, Listener listener) {
         executor.execute(() -> {
             try {
-                listener.onUpdate("resolving", command, "", "");
+                listener.onUpdate("resolving", command, "", "", null);
                 String baseUrl = resolveBaseUrl();
-                listener.onUpdate("sending_text", command, "", "");
+                listener.onUpdate("sending_text", command, "", "", null);
                 JSONObject payload = new JSONObject();
                 payload.put("text", command);
                 JSONObject response = request(
@@ -112,7 +123,9 @@ final class RemoteApiClient {
                 );
                 poll(baseUrl, response.getString("job_id"), listener);
             } catch (Exception exception) {
-                listener.onUpdate("failed", command, "", cleanError(exception));
+                listener.onUpdate(
+                        "failed", command, "", cleanError(exception), null
+                );
             }
         });
     }
@@ -136,6 +149,24 @@ final class RemoteApiClient {
                 );
             } catch (Exception exception) {
                 listener.onReady("", "", "", cleanError(exception));
+            }
+        });
+    }
+
+    void fetchLatestMeeting(MeetingListener listener) {
+        executor.execute(() -> {
+            try {
+                String baseUrl = resolveBaseUrl();
+                JSONObject meeting = request(
+                        baseUrl,
+                        "GET",
+                        "/v1/meetings/latest",
+                        null,
+                        null
+                );
+                listener.onResult(meeting);
+            } catch (Exception ignored) {
+                listener.onResult(null);
             }
         });
     }
@@ -187,7 +218,8 @@ final class RemoteApiClient {
             String heard = job.optString("heard", "");
             String report = job.optString("report", "");
             String error = job.optString("error", "");
-            listener.onUpdate(state, heard, report, error);
+            JSONObject meeting = job.optJSONObject("meeting");
+            listener.onUpdate(state, heard, report, error, meeting);
             if ("completed".equals(state) || "failed".equals(state)) {
                 return;
             }

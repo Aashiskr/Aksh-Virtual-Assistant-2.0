@@ -25,7 +25,15 @@ the report.
 - Remote-screen sessions use an additional random, expiring token and are off by
   default. Disabling the feature terminates active sessions.
 - Windows secrets use DPAPI; the Android pairing token uses Android Keystore.
-- Cloudflare KV stores a tunnel URL and timestamp, never the pairing token.
+- Cloudflare KV never stores the pairing token. It stores the tunnel URL and
+  timestamp; when daily career briefing is enabled it additionally stores the
+  FCM registration token, fixed course/region preferences, and latest briefing.
+- Locked-screen approval uses a one-time, 60-second ECDSA challenge. The phone
+  private key is auth-per-use in Android Keystore and the Windows password is
+  machine-bound DPAPI ciphertext readable only by the local SYSTEM broker.
+- The broker releases a credential once over a SYSTEM/Administrators-only named
+  pipe after signature verification. Built-in Windows PIN/password providers
+  remain enabled for recovery.
 
 This model does not protect a machine that is already compromised, an unlocked
 trusted phone, a stolen Windows account session, malicious accessibility
@@ -40,6 +48,9 @@ software, or a user who approves a harmful action.
   pair every trusted phone again.
 - **Cloudflare:** rotate the relevant account/API credential in Cloudflare and
   redeploy your Worker. The Worker source does not require a secret token.
+- **Firebase:** revoke the service-account key in Google Cloud IAM, create a
+  replacement, update the three encrypted Worker secrets, and redeploy. Never
+  put a Firebase private key or service-account JSON in the repository.
 
 Never send credentials in chat, screenshots, bug reports, commits, release
 assets, or meeting reports.

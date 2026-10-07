@@ -6,7 +6,16 @@
     return Math.abs(deltaY) > Math.abs(deltaX) * 1.2 ? "scroll" : "drag";
   }
 
-  function create({screenArea, video, frame, zoom, sendInput}) {
+  function create({
+    screenArea,
+    video,
+    frame,
+    zoom,
+    sendInput,
+    isPresentationActive = () => false,
+    focusIndicator = null,
+    onFocusPoint = () => {}
+  }) {
     let lastTapAt = 0;
     let lastTapPosition = null;
     let lastPointerPosition = {x: .5, y: .5};
@@ -18,6 +27,23 @@
     let oneFingerMode = "pending";
     let primaryStart = null;
     const pointers = new Map();
+
+    function presentationActive() {
+      return Boolean(isPresentationActive());
+    }
+
+    function pointerCenter() {
+      const activePointers = Array.from(pointers.values());
+      if (!activePointers.length) return null;
+      const total = activePointers.reduce((sum, point) => ({
+        x: sum.x + point.x,
+        y: sum.y + point.y
+      }), {x: 0, y: 0});
+      return {
+        x: total.x / activePointers.length,
+        y: total.y / activePointers.length
+      };
+    }
 
     function contentPoint(clientX, clientY) {
       const rect = screenArea.getBoundingClientRect();
@@ -44,6 +70,20 @@
         y: Math.max(0, Math.min(1, (clientY - rect.top - content.offsetY) / content.height))
       };
       lastPointerPosition = point;
+      if (zoom.rememberFocus) zoom.rememberFocus(clientX, clientY);
+      return point;
+    }
+
+    function selectPresentationFocus(clientX, clientY, source) {
+      const point = contentPoint(clientX, clientY);
+      if (!point) return null;
+      if (focusIndicator) {
+        const rect = screenArea.getBoundingClientRect();
+        focusIndicator.style.left = `${clientX - rect.left}px`;
+        focusIndicator.style.top = `${clientY - rect.top}px`;
+        focusIndicator.hidden = false;
+      }
+      onFocusPoint({...point, source});
       return point;
     }
 
@@ -52,16 +92,21 @@
       screenArea.setPointerCapture(event.pointerId);
       pointers.set(event.pointerId, {x: event.clientX, y: event.clientY});
       if (pointers.size === 1) {
+        contentPoint(event.clientX, event.clientY);
         multiTouchGesture = false;
         dragStarted = false;
         longPressTriggered = false;
         oneFingerMode = "pending";
         primaryStart = {x: event.clientX, y: event.clientY};
         longPressTimer = setTimeout(() => {
-          const point = contentPoint(event.clientX, event.clientY);
+          const point = presentationActive()
+            ? selectPresentationFocus(event.clientX, event.clientY, "hold")
+            : contentPoint(event.clientX, event.clientY);
           if (point && !dragStarted) {
             longPressTriggered = true;
-            sendInput({action: "right_click", ...point});
+            if (!presentationActive()) {
+              sendInput({action: "right_click", ...point});
+            }
           }
         }, 650);
       } else if (pointers.size === 2) {
@@ -72,7 +117,12 @@
         longPressTriggered = false;
         oneFingerMode = "pending";
         primaryStart = null;
-        contentPoint(event.clientX, event.clientY);
+        const center = pointerCenter();
+        if (center && presentationActive()) {
+          selectPresentationFocus(center.x, center.y, "pinch");
+        } else if (center) {
+          contentPoint(center.x, center.y);
+        }
         zoom.beginTwoFinger(pointers);
       }
     });
@@ -84,6 +134,12 @@
       pointers.set(event.pointerId, {x: event.clientX, y: event.clientY});
       if (pointers.size >= 2) {
         if (longPressTimer) clearTimeout(longPressTimer);
+        const center = pointerCenter();
+        if (center && presentationActive()) {
+          selectPresentationFocus(center.x, center.y, "pinch");
+        } else if (center) {
+          contentPoint(center.x, center.y);
+        }
         const gesture = zoom.moveTwoFinger(pointers);
         if (gesture.type === "scroll" && gesture.delta) {
           sendInput({action: "scroll", delta: gesture.delta});
@@ -153,6 +209,16 @@
       if (dragStarted) {
         sendInput({action: "up", ...point});
       } else if (!longPressTriggered && event.type !== "pointercancel") {
+        if (presentationActive()) {
+          selectPresentationFocus(event.clientX, event.clientY, "tap");
+          lastTapAt = 0;
+          lastTapPosition = null;
+          dragStarted = false;
+          longPressTriggered = false;
+          oneFingerMode = "pending";
+          primaryStart = null;
+          return;
+        }
         const now = performance.now();
         const close = lastTapPosition && Math.hypot(
           point.x - lastTapPosition.x,
@@ -177,6 +243,9 @@
     screenArea.addEventListener("pointerup", endPointer);
     screenArea.addEventListener("pointercancel", endPointer);
     return Object.freeze({
+      getFocusPoint() {
+        return {...lastPointerPosition};
+      },
       rightClick() {
         sendInput({action: "right_click", ...lastPointerPosition});
       }

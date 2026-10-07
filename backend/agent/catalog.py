@@ -61,8 +61,8 @@ ACTION_SPECS = (
     ),
     ActionSpec(
         "schedule_meeting",
-        "time",
-        "create a meeting",
+        "time, account, title, duration, attendees",
+        "schedule a Google Calendar event with a Google Meet link",
         Sensitivity.SENSITIVE,
     ),
     ActionSpec(
@@ -111,6 +111,10 @@ PARAMETER_KEYS = (
     "value",
     "option",
     "browser",
+    "account",
+    "title",
+    "duration",
+    "attendees",
 )
 
 

@@ -4,6 +4,9 @@
   "main": "src/index.js",
   "compatibility_date": "2026-07-29",
   "workers_dev": true,
+  "triggers": {
+    "crons": ["30 5 * * *"]
+  },
   "kv_namespaces": [
     {
       "binding": "DEVICES",

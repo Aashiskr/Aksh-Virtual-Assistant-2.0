@@ -1,16 +1,33 @@
 from __future__ import annotations
 
+import ctypes
+import sys
 import tkinter as tk
 from pathlib import Path
 from typing import Callable
 
 from .pet_animation import PetAnimator
 from .pet_geometry import clamp_pet_position, geometry_offset
-from .theme import MUTED, PANEL_BG, STATE_COLORS, TEXT, TRANSPARENT
+from .theme import BORDER, MUTED, PANEL_BG, STATE_COLORS, TEXT, TRANSPARENT
 
 
 PASSIVE_STATUS_STATES = {"idle", "sleeping"}
 MESSAGE_STATUS_MILLISECONDS = 4500
+
+
+def _screen_geometry(root: tk.Tk) -> tuple[int, int, int, int]:
+    if sys.platform == "win32":
+        try:
+            user32 = ctypes.windll.user32
+            left = user32.GetSystemMetrics(76)  # SM_XVIRTUALSCREEN
+            top = user32.GetSystemMetrics(77)  # SM_YVIRTUALSCREEN
+            width = user32.GetSystemMetrics(78)  # SM_CXVIRTUALSCREEN
+            height = user32.GetSystemMetrics(79)  # SM_CYVIRTUALSCREEN
+            if width > 0 and height > 0:
+                return left, top, width, height
+        except (AttributeError, OSError):
+            pass
+    return 0, 0, root.winfo_screenwidth(), root.winfo_screenheight()
 
 
 class PetView:
@@ -59,17 +76,20 @@ class PetView:
             self.root.wm_attributes("-transparentcolor", TRANSPARENT)
         except tk.TclError:
             pass
-        screen_w, screen_h = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        screen_left, screen_top, screen_w, screen_h = _screen_geometry(self.root)
         x = self.settings.pet_x
         y = self.settings.pet_y
-        x = screen_w - self.width - 32 if x is None else x
-        y = screen_h - self.height - 70 if y is None else y
+        x = screen_left + screen_w - self.width - 32 if x is None else x
+        y = screen_top + screen_h - self.height - 70 if y is None else y
         x, y = clamp_pet_position(
             x,
             y,
             screen_width=screen_w,
             screen_height=screen_h,
+            screen_left=screen_left,
+            screen_top=screen_top,
             window_width=self.width,
+            window_height=self.height,
             pet_size=self.settings.pet_size,
         )
         self.root.geometry(
@@ -100,7 +120,7 @@ class PetView:
             self.width - 10,
             self.height - 10,
             fill=PANEL_BG,
-            outline="#303958",
+            outline=BORDER,
         )
         self.name_text = self.canvas.create_text(
             22,
@@ -130,10 +150,10 @@ class PetView:
         self._set_status_visible(False)
         for item in (self.pet_item,):
             self.canvas.tag_bind(item, "<ButtonPress-1>", self._drag_start)
-            self.canvas.tag_bind(item, "<B1-Motion>", self._drag_move)
-            self.canvas.tag_bind(item, "<ButtonRelease-1>", self._drag_end)
             self.canvas.tag_bind(item, "<Double-Button-1>", self._double_click)
             self.canvas.tag_bind(item, "<Button-3>", self.on_context)
+        self.canvas.bind("<B1-Motion>", self._drag_move)
+        self.canvas.bind("<ButtonRelease-1>", self._drag_end)
         self.canvas.bind("<Button-3>", self.on_context)
 
     def set_status(
@@ -173,12 +193,16 @@ class PetView:
         self.animator.set_size(size)
         self.width = max(170, size + 48)
         self.height = size + 92
+        screen_left, screen_top, screen_w, screen_h = _screen_geometry(self.root)
         x, y = clamp_pet_position(
             x,
             y,
-            screen_width=self.root.winfo_screenwidth(),
-            screen_height=self.root.winfo_screenheight(),
+            screen_width=screen_w,
+            screen_height=screen_h,
+            screen_left=screen_left,
+            screen_top=screen_top,
             window_width=self.width,
+            window_height=self.height,
             pet_size=size,
         )
         self.canvas.destroy()
@@ -245,12 +269,16 @@ class PetView:
         start_x, start_y, window_x, window_y = self._drag_origin
         dx, dy = event.x_root - start_x, event.y_root - start_y
         self._dragged = self._dragged or abs(dx) + abs(dy) > 5
+        screen_left, screen_top, screen_w, screen_h = _screen_geometry(self.root)
         x, y = clamp_pet_position(
             window_x + dx,
             window_y + dy,
-            screen_width=self.root.winfo_screenwidth(),
-            screen_height=self.root.winfo_screenheight(),
+            screen_width=screen_w,
+            screen_height=screen_h,
+            screen_left=screen_left,
+            screen_top=screen_top,
             window_width=self.width,
+            window_height=self.height,
             pet_size=self.settings.pet_size,
         )
         self.root.geometry(geometry_offset(x, y))

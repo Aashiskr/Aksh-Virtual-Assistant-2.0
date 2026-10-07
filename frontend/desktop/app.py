@@ -10,15 +10,21 @@ from tkinter import messagebox
 from backend import AkshAssistant, load_settings
 from backend.remote import RemoteCommandServer
 
+from .capture_privacy import (
+    exclude_popup_menus_from_capture,
+    set_capture_excluded,
+)
+from .context_menu import build_context_menu
 from .first_run import ensure_first_run
-from .capture_privacy import set_capture_excluded
 from .hotkey import GlobalHotkey
 from .meeting_ui import MeetingUI
+from .notebook_ui import TaskNotebookUI
 from .panel import CommandPanel
 from .pet_view import PetView
 from .profile_ui import ProfileUI
 from .remote_access_ui import RemoteAccessUI
-from .theme import PANEL_BG, TEXT
+from .settings_ui import SettingsPanel
+from .window_behavior import hide_from_taskbar
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -60,7 +66,14 @@ class AkshPetApp:
             on_moved=lambda x, y: self.store.update(pet_x=x, pet_y=y),
             on_close=self.close,
         )
+        self.root.attributes("-alpha", 0.0)
+        hide_from_taskbar(self.root)
+        set_capture_excluded(self.root)
         self.root.deiconify()
+        self.root.after_idle(
+            lambda: self.root.attributes("-alpha", 1.0)
+        )
+        self.root.after(50, lambda: hide_from_taskbar(self.root))
         self.root.after(50, lambda: set_capture_excluded(self.root))
         self.assistant = AkshAssistant(
             self.settings,
@@ -85,8 +98,22 @@ class AkshPetApp:
             allow_enrollment=self.settings.voice_lock_enabled,
         )
         self.meeting_ui = MeetingUI(self.root, self.assistant)
+        self.notebook_ui = TaskNotebookUI(
+            self.root,
+            self.assistant.brain.notebook,
+        )
         self.profile_ui = ProfileUI(self.root, self.settings.data_dir)
+        self.settings_ui = SettingsPanel(
+            self.root,
+            self.settings,
+            on_wake=self._set_wake_enabled,
+            on_double_clap=self._set_double_clap_enabled,
+            on_continuous=self._set_continuous_enabled,
+            on_enroll=self._confirm_enrollment,
+        )
         self._build_context()
+        exclude_popup_menus_from_capture()
+        self.root.after_idle(exclude_popup_menus_from_capture)
         self.hotkey = GlobalHotkey(
             self.settings.hotkey,
             lambda: self.events.put(("activate", ("hotkey",))),
@@ -98,74 +125,23 @@ class AkshPetApp:
         self.remote.start()
 
     def _build_context(self) -> None:
-        self.context = tk.Menu(
-            self.root,
-            tearoff=0,
-            bg=PANEL_BG,
-            fg=TEXT,
-            activebackground="#293152",
-            activeforeground=TEXT,
-            bd=0,
-        )
-        self.context.add_command(
-            label="Talk now", command=lambda: self._activate("menu")
-        )
-        self.context.add_command(label="Type a command", command=self.show_panel)
-        self.meeting_ui.attach_menu(self.context)
-        self.profile_ui.attach_menu(self.context)
-        self.remote_ui.attach_menu(self.context)
-        self.context.add_separator()
-        if self.settings.voice_lock_enabled:
-            self.context.add_command(
-                label="Enroll owner voice", command=self._confirm_enrollment
-            )
-        else:
-            self.context.add_command(label="Voice lock: Off", state="disabled")
-        size_menu = tk.Menu(
+        (
             self.context,
-            tearoff=0,
-            bg=PANEL_BG,
-            fg=TEXT,
-            activebackground="#293152",
-            activeforeground=TEXT,
-        )
-        size_menu.add_command(
-            label="−  Decrease",
-            command=lambda: self._adjust_pet_size(-PET_SIZE_STEP),
-        )
-        size_menu.add_command(
-            label="+  Increase",
-            command=lambda: self._adjust_pet_size(PET_SIZE_STEP),
-        )
-        self.context.add_cascade(label="Pet size", menu=size_menu)
-        self.wake_variable = tk.BooleanVar(
-            value=self.settings.wake_listener_enabled
-        )
-        self.context.add_checkbutton(
-            label=self._microphone_menu_label(
-                self.settings.wake_listener_enabled
-            ),
-            variable=self.wake_variable,
-            command=self._toggle_wake,
-        )
-        self.microphone_menu_index = self.context.index("end")
-        self.continuous_variable = tk.BooleanVar(
-            value=self.settings.continuous_listening_enabled
-        )
-        self.context.add_checkbutton(
-            label="Always listen (no wake word)",
-            variable=self.continuous_variable,
-            command=self._toggle_continuous,
-        )
-        self.context.add_separator()
-        self.context.add_command(label="Exit Aksh", command=self.close)
+            self.microphone_menu_index,
+            self.wake_variable,
+            self.double_clap_variable,
+            self.continuous_variable,
+        ) = build_context_menu(self, PET_SIZE_STEP)
 
     def _show_context(self, event) -> None:
         self.wake_variable.set(self.settings.wake_listener_enabled)
+        self.double_clap_variable.set(self.settings.double_clap_enabled)
         self.continuous_variable.set(self.settings.continuous_listening_enabled)
         self._refresh_microphone_menu()
+        self.settings_ui.refresh()
         self.meeting_ui.refresh_menu()
         self.remote_ui.refresh()
+        exclude_popup_menus_from_capture()
         try:
             self.context.tk_popup(event.x_root, event.y_root)
         finally:
@@ -173,6 +149,14 @@ class AkshPetApp:
 
     def show_panel(self) -> None:
         self.panel.show(self.root.winfo_x(), self.root.winfo_y())
+
+    def show_settings(self) -> None:
+        self.settings_ui.show(self.root.winfo_x(), self.root.winfo_y())
+
+    def _open_notebook_pdf(self) -> None:
+        self.assistant.brain.notebook.refresh_workspace()
+        result = self.assistant.notebook_exporter.export_and_open()
+        self.view.show_message("aksh", result.message)
 
     def _confirm_enrollment(self) -> None:
         parent = self.panel.window or self.root
@@ -184,18 +168,21 @@ class AkshPetApp:
             self.assistant.enroll_owner_voice()
 
     def _toggle_wake(self) -> None:
-        enabled = bool(self.wake_variable.get())
-        self.store.update(wake_listener_enabled=enabled)
+        self._set_wake_enabled(bool(self.wake_variable.get()))
+
+    def _set_wake_enabled(self, enabled: bool) -> None:
+        self.wake_variable.set(bool(enabled))
+        values = {"wake_listener_enabled": enabled}
+        if not enabled:
+            self.double_clap_variable.set(False)
+            values["double_clap_enabled"] = False
+        self.store.update(**values)
         self.assistant.set_wake_listener_enabled(enabled)
         self._refresh_microphone_menu()
 
     @staticmethod
     def _microphone_menu_label(enabled: bool) -> str:
-        return (
-            "🎙  Microphone listening on"
-            if enabled
-            else "🔇  Microphone listening off"
-        )
+        return "🎙  Microphone listening on" if enabled else "🔇  Microphone listening off"
 
     def _refresh_microphone_menu(self) -> None:
         self.context.entryconfigure(
@@ -206,9 +193,20 @@ class AkshPetApp:
         )
 
     def _toggle_continuous(self) -> None:
-        enabled = bool(self.continuous_variable.get())
+        self._set_continuous_enabled(bool(self.continuous_variable.get()))
+
+    def _set_continuous_enabled(self, enabled: bool) -> None:
+        self.continuous_variable.set(bool(enabled))
         self.store.update(continuous_listening_enabled=enabled)
         self.assistant.set_continuous_listening_enabled(enabled)
+
+    def _toggle_double_clap(self) -> None:
+        self._set_double_clap_enabled(bool(self.double_clap_variable.get()))
+
+    def _set_double_clap_enabled(self, enabled: bool) -> None:
+        self.double_clap_variable.set(bool(enabled))
+        self.store.update(double_clap_enabled=enabled)
+        self.assistant.set_double_clap_enabled(enabled)
 
     def _activate(self, source: str) -> None:
         if not self.settings.wake_listener_enabled:
@@ -234,10 +232,27 @@ class AkshPetApp:
                 event, values = self.events.get_nowait()
                 if event == "status":
                     state, text = values
-                    if state == "sleeping" and self.wake_variable.get():
-                        self.wake_variable.set(False)
-                        self.store.update(wake_listener_enabled=False)
+                    wake_enabled = bool(self.settings.wake_listener_enabled)
+                    settings_changed = False
+                    if bool(self.wake_variable.get()) != wake_enabled:
+                        self.wake_variable.set(wake_enabled)
+                        self.store.update(wake_listener_enabled=wake_enabled)
                         self._refresh_microphone_menu()
+                        settings_changed = True
+                    double_clap_enabled = bool(
+                        self.settings.double_clap_enabled
+                    )
+                    if (
+                        bool(self.double_clap_variable.get())
+                        != double_clap_enabled
+                    ):
+                        self.double_clap_variable.set(double_clap_enabled)
+                        self.store.update(
+                            double_clap_enabled=double_clap_enabled
+                        )
+                        settings_changed = True
+                    if settings_changed:
+                        self.settings_ui.refresh()
                     self.view.set_status(
                         state,
                         text,

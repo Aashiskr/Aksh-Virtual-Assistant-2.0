@@ -19,9 +19,10 @@ public final class RemoteScreenActivity extends Activity {
     static final String SESSION_ID = "aksh.screen_session";
     private WebView webView;
     private RemoteScreenDisplayController displayController;
+    private RemoteScreenRecovery recovery;
     private String baseUrl = "";
     private String token = "";
-    private String sessionId = "";
+    private volatile String sessionId = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,6 +33,7 @@ public final class RemoteScreenActivity extends Activity {
         );
         setContentView(R.layout.activity_remote_screen);
         displayController = new RemoteScreenDisplayController(this);
+        recovery = new RemoteScreenRecovery(this);
         baseUrl = getIntent().getStringExtra(BASE_URL);
         token = getIntent().getStringExtra(TOKEN);
         sessionId = getIntent().getStringExtra(SESSION_ID);
@@ -57,6 +59,11 @@ public final class RemoteScreenActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         webView.setWebViewClient(new LockedWebViewClient());
         webView.setWebChromeClient(new WebChromeClient());
+        installBridge();
+    }
+
+    private void installBridge() {
+        webView.removeJavascriptInterface("AkshBridge");
         webView.addJavascriptInterface(
                 new RemoteScreenBridge(this, baseUrl, token, sessionId),
                 "AkshBridge"
@@ -78,6 +85,22 @@ public final class RemoteScreenActivity extends Activity {
                     .replace(
                             "{{AKSH_DISPLAY_SCRIPT}}",
                             readAsset("remote_screen_display.js")
+                    )
+                    .replace(
+                            "{{AKSH_CONTROLS_SCRIPT}}",
+                            readAsset("remote_screen_controls.js")
+                    )
+                    .replace(
+                            "{{AKSH_PRESENTATION_SCRIPT}}",
+                            readAsset("remote_screen_presentation.js")
+                    )
+                    .replace(
+                            "{{AKSH_SESSION_SCRIPT}}",
+                            readAsset("remote_screen_session.js")
+                    )
+                    .replace(
+                            "{{AKSH_TRANSPORT_SCRIPT}}",
+                            readAsset("remote_screen_transport.js")
                     )
                     .replace("{{AKSH_SCRIPT}}", readAsset("remote_screen.js"));
             webView.loadDataWithBaseURL(
@@ -104,8 +127,27 @@ public final class RemoteScreenActivity extends Activity {
         displayController.toggleFullscreenLandscape();
     }
 
+    void refreshRemoteConnection() {
+        recovery.request((newBaseUrl, newToken, newSessionId) -> {
+            baseUrl = newBaseUrl;
+            token = newToken;
+            sessionId = newSessionId;
+            installBridge();
+            loadRemoteUi();
+        });
+    }
+
+    void updateScreenSession(String currentSessionId) {
+        if (currentSessionId != null && !currentSessionId.isBlank()) {
+            sessionId = currentSessionId;
+        }
+    }
+
     @Override
     protected void onDestroy() {
+        if (recovery != null) {
+            recovery.close();
+        }
         if (webView != null) {
             webView.removeJavascriptInterface("AkshBridge");
             webView.destroy();

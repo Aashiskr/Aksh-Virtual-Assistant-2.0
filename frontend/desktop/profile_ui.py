@@ -6,7 +6,7 @@ from tkinter import filedialog, messagebox
 
 from backend.profile import UserProfileStore
 
-from .theme import PANEL_BG, TEXT
+from .theme import PANEL_BG, SURFACE_ALT, TEXT
 
 
 class ProfileUI:
@@ -20,7 +20,7 @@ class ProfileUI:
             tearoff=0,
             bg=PANEL_BG,
             fg=TEXT,
-            activebackground="#293152",
+            activebackground=SURFACE_ALT,
             activeforeground=TEXT,
         )
         menu.add_command(label="Import / Replace CV…", command=self.import_cv)

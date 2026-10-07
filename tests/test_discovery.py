@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 
 from backend.config import AkshSettings
 from backend.remote.discovery import DiscoveryPublisher, device_id_for_token
+from backend.remote.tunnel import RemoteTunnel
 
 
 class DiscoveryTests(unittest.TestCase):
@@ -29,6 +30,24 @@ class DiscoveryTests(unittest.TestCase):
         self.assertTrue(
             kwargs["headers"]["Authorization"].startswith("Bearer ")
         )
+
+
+class RemoteTunnelRecoveryTests(unittest.TestCase):
+    @patch("backend.remote.tunnel.threading.Timer")
+    def test_exited_quick_tunnel_clears_stale_url_and_restarts(self, timer):
+        tunnel = RemoteTunnel(AkshSettings(remote_tunnel_enabled=True))
+        process = Mock()
+        process.wait.return_value = 1
+        tunnel._process = process
+        tunnel.public_url = "https://expired-link.trycloudflare.com"
+        tunnel._ready.set()
+
+        tunnel._watch_process(process)
+
+        self.assertEqual(tunnel.public_url, "")
+        self.assertEqual(tunnel.status, "disconnected")
+        timer.assert_called_once_with(2.0, tunnel.start)
+        timer.return_value.start.assert_called_once_with()
 
 
 if __name__ == "__main__":

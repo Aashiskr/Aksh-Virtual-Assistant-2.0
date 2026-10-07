@@ -9,9 +9,11 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
+from ..calendar_meetings import MeetingStore, public_meeting
 from ..config import AkshSettings
 from ..integrations.groq_speech import GroqSpeechTranscriber
 from ..remote_desktop import RemoteDesktopManager, attach_remote_desktop_routes
+from ..windows_unlock import WindowsUnlockClient, attach_windows_unlock_routes
 from .credentials import PairingTokenStore
 from .discovery import DiscoveryPublisher
 from .jobs import RemoteJobStore
@@ -31,8 +33,10 @@ class RemoteCommandServer:
         self.settings = settings
         self.command_handler = command_handler
         self.token = self._load_token()
+        self.unlock = WindowsUnlockClient(self.token)
         self.discovery = DiscoveryPublisher(settings, self.token)
         self.jobs = RemoteJobStore()
+        self.meetings = MeetingStore(settings.data_dir / "meetings.json")
         self.transcriber = GroqSpeechTranscriber(settings)
         self.screen = RemoteDesktopManager(settings)
         self.pending: queue.Queue[tuple[str, str, object] | None] = queue.Queue()
@@ -120,6 +124,7 @@ class RemoteCommandServer:
                 "ok": True,
                 "assistant": self.settings.assistant_name,
                 "remote_screen": self.screen.enabled,
+                **self.unlock.health(),
             }
 
         @app.post("/v1/commands/text", status_code=202)
@@ -161,7 +166,17 @@ class RemoteCommandServer:
                 raise HTTPException(status_code=404, detail="Command not found")
             return job.public()
 
+        @app.get("/v1/meetings/latest")
+        def latest_meeting(
+            _: None = Depends(authorize),
+        ) -> dict[str, object]:
+            meeting = public_meeting(self.meetings.latest())
+            if not meeting:
+                raise HTTPException(status_code=404, detail="Meeting not found")
+            return meeting
+
         attach_remote_desktop_routes(app, self.screen, authorize)
+        attach_windows_unlock_routes(app, self.unlock, authorize)
 
         return app
 
@@ -172,6 +187,7 @@ class RemoteCommandServer:
                 return
             job_id, kind, payload = item
             heard = ""
+            previous_meeting_id = self.meetings.latest_id()
             try:
                 self.jobs.processing(job_id)
                 if kind == "audio":
@@ -182,7 +198,14 @@ class RemoteCommandServer:
                     heard = str(payload).strip()
                 self.jobs.processing(job_id, heard)
                 report = self.command_handler(heard)
-                self.jobs.complete(job_id, heard, report)
+                latest = self.meetings.latest()
+                meeting = (
+                    public_meeting(latest)
+                    if latest
+                    and str(latest.get("id") or "") != previous_meeting_id
+                    else None
+                )
+                self.jobs.complete(job_id, heard, report, meeting=meeting)
             except Exception as exc:
                 if kind == "audio":
                     Path(payload).unlink(missing_ok=True)

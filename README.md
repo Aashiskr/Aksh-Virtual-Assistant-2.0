@@ -21,13 +21,14 @@ accidentally approving an older interpretation.
 | Capability | What Aksh can do |
 | --- | --- |
 | Natural conversation | Understand Hindi, Hinglish, English, follow-ups, corrections, and fuzzy names |
+| Session Task Notebook | Track requests, outcomes, open apps, browser pages, and who completed each task |
 | Desktop agent | Open apps/sites, search, control windows/media, and run bounded multi-step plans |
 | Communications | Use WhatsApp Desktop or WhatsApp Web for confirmed messages and calls |
 | Media | Resolve a real YouTube result, honor an explicitly requested browser, and control playback |
 | Shopping | Maintain a Flipkart session across search, next/previous, refinements, size, and add-to-cart |
 | Meeting Mode | Silently transcribe, suggest live written answers, review replies, and create reports |
-| Android companion | Send voice/text commands and view/control the laptop after explicit permission |
-| Desktop pet | Drag, resize, double-click to listen, use expressions, or activate with `Ctrl+Alt+K` |
+| Android companion | Send voice/text commands, view/control the laptop, and receive cloud career alerts |
+| Desktop pet | Drag, resize, double-click or double-clap to listen, or activate with `Ctrl+Alt+K` |
 
 ## Safety and privacy defaults
 
@@ -41,6 +42,8 @@ accidentally approving an older interpretation.
   the configured confirmation policy.
 - The public repository has no shared Cloudflare Worker, KV namespace, API key,
   pairing token, phone number, meeting transcript, browser profile, or CV.
+- The Session Task Notebook works in memory; an explicitly requested PDF/text
+  view is temporary, credentials are redacted, and exports are deleted on exit.
 - Checkout and payment are intentionally not automated.
 
 See [SECURITY.md](SECURITY.md) and [docs/PRIVACY.md](docs/PRIVACY.md) before
@@ -53,13 +56,15 @@ flowchart LR
     U["Owner: voice, text, pet or hotkey"] --> B["Groq intent planner"]
     P["Paired Android app"] --> R["Token-protected FastAPI remote"]
     R --> B
-    B --> V["Schema validation + bounded plan"]
+    B --> N["Session Task Notebook context"]
+    N --> V["Schema validation + bounded plan"]
     V --> C{"Confirmation required?"}
     C -->|Yes| O["Owner confirm or cancel"]
     O --> E["Approved action executor"]
     C -->|No| E
     E --> T["Desktop, browser, media, WhatsApp, shopping"]
     E --> M["Local status and reports"]
+    E --> N
 ```
 
 The code is organized by responsibility:
@@ -72,6 +77,7 @@ backend/
   audio/                        listening, voiceprint, speech, and TTS
   brain/                        Groq planner, schema, memory, local fallback
   meeting/                      dual-source capture, coaching, reports
+  notebook/                     in-memory task history and decision context
   profile/                      local CV/profile context
   remote/                       pairing, jobs, discovery, tunnel, API
   remote_desktop/               screen sessions, capture, WebRTC, input
@@ -96,6 +102,46 @@ tests/                          behavior, regression, and safety tests
 - JDK 17 and Android SDK only when building the Android app
 
 The laptop microphone is optional when commands are sent as text or phone audio.
+With **Double clap to talk** enabled in the pet's right-click menu, two clear
+claps about 0.12–0.70 seconds apart open the command microphone. Clap detection
+runs locally and does not transcribe or save the sampled audio. Turn this option
+off as well as microphone listening when the laptop microphone must stay closed.
+For loud music or videos, keep **Always listen (no wake word)** unchecked.
+Double-clap then opens one command only, and Aksh briefly mutes laptop output
+while the command microphone is open before restoring the previous mute state.
+
+Always-listening mode keeps a local, hashed replay history—never the spoken
+text or recording. After Aksh or the laptop restarts, no-wake-word commands stay
+disarmed until one explicit session activation: say `Hey Aksh`, double-click the
+pet, use the hotkey, or turn microphone listening on. Aksh then keeps listening
+for that session until `mic off`. This prevents stale/background microphone
+audio from executing an old command after restart. Explicit phone and text
+commands work independently. Repeated continuous commands are also suppressed.
+
+## Session Task Notebook
+
+Every command creates a session task. The notebook records the user request,
+Aksh's bounded plan, confirmation state, each attempted action, its real result,
+and whether the user or Aksh completed it. Aksh receives a short redacted view
+of recent tasks before planning the next request, so follow-ups can reuse valid
+context—for example, a second YouTube song stays in the successful browser from
+the first request.
+
+The notebook's **Current Workspace** scans supported visible Windows apps such
+as Brave, Chrome, File Explorer, ChatGPT, WhatsApp, and Office apps. Browser
+window titles show the visible page in each window; when a browser is currently
+focused, Aksh can also read a sanitized URL without its query string or
+fragment. Aksh's own website, search, playback, and browser-control results are
+kept as recent browser activity. Background tabs that are not represented by a
+visible browser window are not inspected.
+
+Say `task notebook dikhao` or use **Aksh pet > Open Task Notebook PDF** to
+generate and open a readable temporary PDF; Aksh does not speak the notebook
+summary. If PDF support is unavailable, it opens a UTF-8 text file instead. The
+live window remains available under **Session Task Notebook**. Report `maine ye
+kar diya` to mark the matching task as completed by the user. **Exit Aksh**
+deletes these temporary exports, clears the notebook, and starts the next launch
+empty.
 
 ## Windows setup
 
@@ -160,6 +206,31 @@ The app remembers the configuration. The token is encrypted with Android
 Keystore, so restarting the phone or laptop normally does not require pairing
 again.
 
+Aksh Remote also includes an optional **Daily career briefing** for a B.Tech
+final-year profile covering Uttar Pradesh, Bihar, and relevant All-India
+opportunities. The per-user Cloudflare Worker checks for recent internships,
+placements, scholarships, government exams, and engineering recruitment every
+day at 11:00 AM IST, then uses Firebase Cloud Messaging to notify the phone.
+This flow does not depend on the laptop being awake. Complete the Firebase and
+Worker secret setup in
+[`frontend/mobile/android/README.md`](frontend/mobile/android/README.md).
+
+Remote viewing uses low-latency WebRTC when a direct path is available. Across
+different networks or carrier NAT, it automatically keeps viewing and input
+alive through the authenticated HTTPS tunnel, with session renewal and bounded
+reconnect retries.
+
+### Locked-screen access on Windows Home
+
+Aksh Remote Screen intentionally cannot cross the protected Windows lock
+screen. The Android **Unlock laptop with fingerprint** action now signs a
+fresh, expiring challenge with a biometric-protected Android Keystore key.
+The Aksh Windows credential provider consumes the encrypted local credential
+only after that signature is verified. The Windows account password is stored
+with machine-bound DPAPI protection and is never sent to the phone or cloud.
+Normal Windows PIN/password sign-in remains available. Complete setup in
+[the secure remote-login guide](docs/SECURE_REMOTE_LOGIN.md).
+
 ### Remote-screen gestures
 
 - Tap: click
@@ -167,13 +238,24 @@ again.
 - Hold: right-click
 - One-finger vertical swipe: scroll
 - One-finger horizontal/diagonal motion: move or drag the pointer
+- Scroll up/down buttons: scroll the current laptop page under the pointer
 - Two fingers at 100%: scroll
-- Pinch: zoom from 100% to 250%
+- Pinch: zoom from 100% to 250% around the touched area
 - Two fingers above 100%: pan across hidden areas
 - Fullscreen: immersive landscape mode
 
+Turn on the lower **PPT Present** control in the phone viewer to replace the general remote
+controls with presentation-safe **Previous**, **Next**, and **Laptop zoom**
+controls. In PPT mode, tap or pinch the slide area to place the focus target,
+then use Laptop zoom; a focus tap does not click or advance the slide. Laptop
+zoom moves to that target through Windows Magnifier, while the **Phone zoom**
+controls and pinch gesture enlarge the preview around the chosen touch point. Resetting
+zoom, turning PPT mode off, closing the viewer, replacing the phone session, or
+letting it expire restores any Magnifier state started by Aksh. A replaced
+phone session is stopped instead of automatically taking control back.
+
 The server accepts only bounded pointer coordinates, bounded scroll values,
-safe text paste, and allow-listed quick keys.
+safe text paste, allow-listed quick keys, and dedicated presentation actions.
 
 ## Activation and example commands
 

@@ -19,12 +19,58 @@
   <main id="screenArea">
     <video id="remoteVideo" autoplay playsinline muted></video>
     <img id="fallbackFrame" alt="Laptop screen">
-    <div id="zoomControls" class="zoom-controls" aria-label="Screen zoom controls">
+    <div class="presentation-focus-hint" aria-hidden="true">
+      Tap or pinch an area, then use Laptop Zoom
+    </div>
+    <div
+      id="presentationFocusIndicator"
+      class="presentation-focus-indicator"
+      aria-hidden="true"
+      hidden
+    ></div>
+    <label id="pptModeControl" class="ppt-mode-control" for="pptPresentToggle">
+      <input id="pptPresentToggle" type="checkbox">
+      <span class="ppt-switch" aria-hidden="true"><span></span></span>
+      <span id="presentationModeText">PPT Present</span>
+    </label>
+    <div id="zoomControls" class="zoom-controls" aria-label="Phone preview zoom controls">
+      <span class="zoom-caption">PHONE ZOOM</span>
       <button id="zoomOutButton" aria-label="Zoom out">&#x2212;</button>
       <button id="zoomValueButton" aria-label="Reset zoom">100%</button>
       <button id="zoomInButton" aria-label="Zoom in">+</button>
       <button id="fullScreenButton" aria-label="Enter fullscreen landscape" aria-pressed="false">&#x26F6;</button>
     </div>
+    <section
+      id="presentationControls"
+      class="presentation-controls"
+      aria-label="PowerPoint presentation controls"
+      aria-hidden="true"
+      hidden
+    >
+      <div class="presentation-summary">
+        <span class="presentation-live-dot" aria-hidden="true"></span>
+        <span>
+          <strong>PRESENTATION</strong>
+          <small id="presentationZoomText" aria-live="polite">Laptop zoom ready</small>
+        </span>
+      </div>
+      <div class="presentation-slides" role="group" aria-label="Change slide">
+        <button id="presentationPreviousButton" class="presentation-slide-button">
+          <span aria-hidden="true">&#x2190;</span>
+          <span>Previous</span>
+        </button>
+        <button id="presentationNextButton" class="presentation-slide-button accent">
+          <span>Next</span>
+          <span aria-hidden="true">&#x2192;</span>
+        </button>
+      </div>
+      <div class="presentation-zoom" role="group" aria-label="Laptop magnifier zoom">
+        <span class="presentation-zoom-label">LAPTOP ZOOM</span>
+        <button id="presentationZoomOutButton" aria-label="Zoom laptop out">&#x2212;</button>
+        <button id="presentationZoomResetButton" aria-label="Reset laptop magnifier">Reset</button>
+        <button id="presentationZoomInButton" aria-label="Zoom laptop in">+</button>
+      </div>
+    </section>
     <div id="loading">
       <div class="pulse"></div>
       <strong>Connecting to your laptop</strong>
@@ -34,8 +80,8 @@
 
   <section class="quick-keys">
     <button data-key="alt_tab">Alt+Tab</button>
-    <button data-key="esc">Esc</button>
-    <button data-key="backspace">Back</button>
+    <button data-scroll="up" aria-label="Scroll current page up">Scroll &#x2191;</button>
+    <button data-scroll="down" aria-label="Scroll current page down">Scroll &#x2193;</button>
     <button data-key="enter">Enter</button>
     <button id="rightClickButton">Right click</button>
   </section>
@@ -53,12 +99,17 @@
     <span>Pinch: zoom</span>
     <span>Zoomed: 2-finger pan</span>
     <span>At 100%: 2-finger scroll</span>
+    <span>Scroll buttons: current page up/down</span>
     <span>Floating button: fullscreen landscape</span>
   </footer>
 
   <script>{{AKSH_ZOOM_SCRIPT}}</script>
   <script>{{AKSH_GESTURES_SCRIPT}}</script>
   <script>{{AKSH_DISPLAY_SCRIPT}}</script>
+  <script>{{AKSH_CONTROLS_SCRIPT}}</script>
+  <script>{{AKSH_PRESENTATION_SCRIPT}}</script>
+  <script>{{AKSH_SESSION_SCRIPT}}</script>
+  <script>{{AKSH_TRANSPORT_SCRIPT}}</script>
   <script>{{AKSH_SCRIPT}}</script>
 </body>
 </html>

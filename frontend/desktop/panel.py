@@ -3,7 +3,15 @@ from __future__ import annotations
 import tkinter as tk
 from typing import Callable
 
-from .theme import PANEL_BG, TEXT
+from .theme import (
+    ACCENT,
+    ACCENT_HOVER,
+    BORDER,
+    PANEL_BG,
+    SURFACE,
+    SURFACE_ALT,
+    TEXT,
+)
 from .capture_privacy import set_capture_excluded
 
 
@@ -46,10 +54,12 @@ class CommandPanel:
         ).pack(anchor="w", padx=18, pady=(16, 8))
         entry = tk.Entry(
             panel,
-            bg="#1c233c",
+            bg=SURFACE,
             fg=TEXT,
             insertbackground=TEXT,
-            relief="flat",
+            relief="solid",
+            bd=1,
+            highlightbackground=BORDER,
             font=("Segoe UI", 11),
         )
         entry.pack(fill="x", padx=18, ipady=8)
@@ -64,23 +74,24 @@ class CommandPanel:
         entry.bind("<Return>", send)
         buttons = tk.Frame(panel, bg=PANEL_BG)
         buttons.pack(fill="x", padx=18, pady=14)
-        self._button(buttons, "Talk", self.on_talk, "#3d63ff").pack(side="left")
-        self._button(buttons, "Send", send, "#232c4b").pack(side="left", padx=8)
+        self._button(buttons, "Talk", self.on_talk, ACCENT).pack(side="left")
+        self._button(buttons, "Send", send, SURFACE_ALT).pack(side="left", padx=8)
         if self.allow_enrollment:
             self._button(
-                buttons, "Enroll voice", self.on_enroll, "#232c4b"
+                buttons, "Enroll voice", self.on_enroll, SURFACE_ALT
             ).pack(side="right")
 
     @staticmethod
     def _button(parent, label, command, background):
+        accent = background == ACCENT
         return tk.Button(
             parent,
             text=label,
             command=command,
             bg=background,
-            fg=TEXT,
-            activebackground="#5475ff",
-            activeforeground=TEXT,
+            fg="#ffffff" if accent else TEXT,
+            activebackground=ACCENT_HOVER if accent else "#dfe3de",
+            activeforeground="#ffffff" if accent else TEXT,
             relief="flat",
             padx=16,
             pady=6,
